@@ -395,7 +395,7 @@ public class DMRServer implements Runnable {
 	}
 
 	public static void usage() {
-		System.out.println("Usage: DMRServer -port 62031 [-ip 0.0.0.0] [-replay 5]");
+		System.out.println("Usage: DMRServer -port 62031 [-ip 0.0.0.0] ");
 	}
 
 	public static void exitOnError(String reason) {
@@ -405,6 +405,13 @@ public class DMRServer implements Runnable {
 		System.exit(-1);
 	}
 
+	public static void checkFiles() {
+		File f=new File(DMRAuth.filename) ;
+		if( ! f.exists()) {
+			exitOnError("Missing required file: auth.properties, see documentation");			
+		}
+	}
+	
 	public static void main(String[] args) {
 		try {
 
@@ -431,7 +438,9 @@ public class DMRServer implements Runnable {
 				if (sip != null)
 					ip = sip;
 			}
-
+			
+			checkFiles() ;
+			
 			DMRServer server = new DMRServer(port, InetAddress.getByName(ip));
 			Thread th = new Thread(server);
 			th.start();
