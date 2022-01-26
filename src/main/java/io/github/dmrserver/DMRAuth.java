@@ -20,7 +20,7 @@ public class DMRAuth {
 	public static Logger logger = Logger.getLogger() ;
 	
 	private static DMRAuth _instance = null;
-	String filename = "auth.properties";
+	public static String filename = "auth.properties";
 
 	HashMap<Integer, String> exactMap = new HashMap<>();
 	HashMap<String, String> patternMap = new HashMap<>();
