@@ -7,6 +7,8 @@ import java.util.Date;
 import java.util.TimerTask;
 
 public class ReplayTask extends TimerTask {
+	public static Logger logger = Logger.getLogger();
+	
 	DatagramSocket local_socket;
 	DMRCapture capture;
 	DMRServer server;
@@ -19,7 +21,7 @@ public class ReplayTask extends TimerTask {
 
 	@Override
 	public void run() {
-		System.out.println("ReplayTask: " + new Date());
+		logger.log("ReplayTask: " + new Date());
 
 		DatagramPacket packet = new DatagramPacket(new byte[8], 8);
 		// packet.setPort( capture.getPort() ) ;
@@ -46,13 +48,13 @@ public class ReplayTask extends TimerTask {
 				// System.out.println(DMRDecode.hex(bar,0,rec.getLength()) );
 
 				DMRDecode dec = new DMRDecode(packet.getData(), packet.getLength());
-				System.out.println("write replay: " + dec.toString() + " " + rec.getTime());
+				logger.log("write replay: " + dec.toString() + " " + rec.getTime());
 
 				try {
 					server.forward(packet);
 					// local_socket.send( packet) ;
 				} catch (Exception ex) {
-					ex.printStackTrace();
+					Logger.handleException(ex);
 				}
 
 				pos++;
@@ -65,7 +67,7 @@ public class ReplayTask extends TimerTask {
 			} catch (Exception ex) {
 			}
 		}
-		System.out.println("ReplayTask Complete: " + new Date());
+		logger.log("ReplayTask Complete: " + new Date());
 
 	}
 

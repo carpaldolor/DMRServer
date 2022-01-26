@@ -28,7 +28,7 @@ public class PurgeTask extends TimerTask {
 			}
 
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 	}
 

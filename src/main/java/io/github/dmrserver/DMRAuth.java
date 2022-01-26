@@ -79,7 +79,7 @@ public class DMRAuth {
 					return false;
 			return true;
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 		return false;
 	}
@@ -104,7 +104,7 @@ public class DMRAuth {
 			}
 			br.close();
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 	}
 }

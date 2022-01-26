@@ -110,7 +110,7 @@ public class DMRServer implements Runnable {
 					}
 				}
 			} catch (Exception ex) {
-				ex.printStackTrace();
+				Logger.handleException(ex);
 			}
 		}
 
@@ -325,7 +325,7 @@ public class DMRServer implements Runnable {
 				// local_socket.send(ret) ;
 			}
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 	}
 
@@ -339,7 +339,7 @@ public class DMRServer implements Runnable {
 				local_socket.receive(packet);
 				handlePacket(packet, null);
 			} catch (Exception ex) {
-				ex.printStackTrace();
+				Logger.handleException(ex);
 			}
 		}
 	}
@@ -449,7 +449,7 @@ public class DMRServer implements Runnable {
 			// start console
 			monitor(server);
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 	}
 }

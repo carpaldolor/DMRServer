@@ -56,6 +56,9 @@ public class Logger {
 		return true ;
 	}
 	
+	public static void handleException(Exception ex) {
+		ex.printStackTrace();
+	}
 	
 	public void writeMessage(String message) {
 		System.out.println( sdf.format(new Date())+" " +  message) ;

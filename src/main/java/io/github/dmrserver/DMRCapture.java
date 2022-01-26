@@ -1,8 +1,13 @@
 package io.github.dmrserver ;
 
-import java.net.* ;
-import java.io.* ;
-import java.util.* ;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.util.ArrayList;
 
 public class DMRCapture implements Serializable {
     private static final long serialVersionUID = 0L;
@@ -54,7 +59,7 @@ public class DMRCapture implements Serializable {
 	        System.out.println( "read file: "+fname +" size:"+ret.getFrameCount()) ;	
 		}
 		catch(Exception ex) {
-			ex.printStackTrace() ;
+			Logger.handleException(ex) ;
 		}
 		return ret ;
 	}
@@ -69,7 +74,7 @@ public class DMRCapture implements Serializable {
 	        System.out.println( "output file: "+fname) ;	
 		}
 		catch(Exception ex) {
-			ex.printStackTrace() ;
+			Logger.handleException(ex) ;
 		}
 	}
 }

@@ -32,7 +32,7 @@ public class TCPListener {
 							spawn(s);
 						}
 					} catch (Exception ex) {
-						ex.printStackTrace();
+						Logger.handleException(ex);
 					}
 					try {
 						Thread.sleep(10000);
@@ -84,7 +84,7 @@ public class TCPListener {
 						}
 					}
 				} catch (Exception ex) {
-					ex.printStackTrace();
+					Logger.handleException(ex);
 				} finally {
 					try {
 						s.close();

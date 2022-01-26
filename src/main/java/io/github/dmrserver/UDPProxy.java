@@ -51,7 +51,7 @@ public class UDPProxy implements Runnable {
 				remote_socket.send(packet);
 			}
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 	}
 
@@ -71,7 +71,7 @@ public class UDPProxy implements Runnable {
 				local_socket.send(packet);
 			}
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 	}
 
@@ -87,7 +87,7 @@ public class UDPProxy implements Runnable {
 				proxy.incoming();
 			}
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 	}
 }

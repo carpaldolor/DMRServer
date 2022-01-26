@@ -9,6 +9,8 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 public class Encryption {
+	public static Logger logger = Logger.getLogger();
+	
 	public static final int SHA256_BLOCK_SIZE = 32;
 	public static final String algorithm = "AES/CBC/NoPadding";
 
@@ -16,7 +18,6 @@ public class Encryption {
 	IvParameterSpec iv;
 
 	public Encryption() {
-
 	}
 
 	public Encryption(String key) {
@@ -33,7 +34,7 @@ public class Encryption {
 				hash = digest.digest(str.getBytes(StandardCharsets.UTF_8));
 			}
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 		return hash;
 	}
@@ -66,7 +67,7 @@ public class Encryption {
 			System.arraycopy(plainText, 2, ret, 0, clen);
 			plainText = ret;
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 		return plainText;
 	}
@@ -88,7 +89,7 @@ public class Encryption {
 			cipher.init(Cipher.ENCRYPT_MODE, secretkey, iv);
 			cipherText = cipher.doFinal(cipherText, 0, cipherText.length);
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			Logger.handleException(ex);
 		}
 		return cipherText;
 	}
@@ -115,27 +116,27 @@ public class Encryption {
 		String oper = args[1];
 		String msg = args[2];
 
-		System.out.println("string: " + key);
+		logger.log("string: " + key);
 		byte[] iv = reHash(key, 1000);
 		byte[] skey = reHash(key, 10000);
-		System.out.println("iv: " + DMRDecode.hex(iv, 0, iv.length));
-		System.out.println("key: " + DMRDecode.hex(skey, 0, skey.length));
+		logger.log("iv: " + DMRDecode.hex(iv, 0, iv.length));
+		logger.log("key: " + DMRDecode.hex(skey, 0, skey.length));
 
 		Encryption enc = new Encryption(key);
 		if (oper.equals("-e")) {
 			enc.init(key);
 			byte[] encoded = enc.encrypt(msg.getBytes(StandardCharsets.UTF_8), 0, msg.length());
-			System.out.println("cipher: " + encoded.length + " " + DMRDecode.hex(encoded, 0, encoded.length));
+			logger.log("cipher: " + encoded.length + " " + DMRDecode.hex(encoded, 0, encoded.length));
 		}
 
 		if (oper.equals("-d")) {
 			msg = msg.trim().replaceAll("\\s*", "");
 
 			byte[] encoded = hexStringToByteArray(msg);
-			System.out.println("encoded: " + DMRDecode.hex(encoded, 0, encoded.length));
+			logger.log("encoded: " + DMRDecode.hex(encoded, 0, encoded.length));
 
 			byte[] decoded = enc.decrypt(encoded, 0, encoded.length);
-			System.out.println("cipher: " + decoded.length + " " + new String(decoded));
+			logger.log("cipher: " + decoded.length + " " + new String(decoded));
 		}
 
 	}
