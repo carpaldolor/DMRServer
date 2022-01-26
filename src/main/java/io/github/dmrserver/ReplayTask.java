@@ -61,7 +61,7 @@ public class ReplayTask extends TimerTask {
 				rec = list.get(pos);
 			}
 			try {
-				Thread.sleep(10);
+				Thread.sleep(1);
 			} catch (Exception ex) {
 			}
 		}

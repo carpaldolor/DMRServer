@@ -1,0 +1,3 @@
+This software package is licensed under the terms of the GNU General Public License version 2 (GPLv2) with the following clarifications:
+-you are not permitted to sell software containing elements of this package
+-you are not permitted to sell services that rely on elements of this package

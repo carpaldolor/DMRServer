@@ -17,6 +17,8 @@ import java.util.HashMap;
 *
 */
 public class DMRAuth {
+	public static Logger logger = Logger.getLogger() ;
+	
 	private static DMRAuth _instance = null;
 	String filename = "auth.properties";
 
@@ -65,14 +67,12 @@ public class DMRAuth {
 			byte[] sha = new byte[authBytes.length + 4];
 			DMRDecode.intToBytes(salt, sha, 0);
 			System.arraycopy(authBytes, 0, sha, 4, authBytes.length);
-			if (DMRServer.DEBUG > 1)
-				System.out.println("checkAuth sha bytes: " + DMRDecode.hex(sha, 0, sha.length));
+			if( logger.log(2) ) logger.log("checkAuth sha bytes: " + DMRDecode.hex(sha, 0, sha.length));
 
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
 			byte[] hash = digest.digest(sha);
 
-			if (DMRServer.DEBUG > 1)
-				System.out.println("checkAuth hash bytes: " + DMRDecode.hex(hash, 0, hash.length));
+			if( logger.log(2) ) logger.log("checkAuth hash bytes: " + DMRDecode.hex(hash, 0, hash.length));
 
 			for (int i = 0; i < 32; i++)
 				if (hash[i] != bar[i + pos])
@@ -90,7 +90,7 @@ public class DMRAuth {
 			String line = null;
 			while ((line = br.readLine()) != null) {
 				line = line.trim();
-				if (!line.startsWith("#")) {
+				if (!line.startsWith("#") && line.length()>0) {
 					String[] sar = line.split("=");
 					if (sar.length == 2) {
 						if (sar[0].endsWith("*")) {

@@ -12,13 +12,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Timer;
 
 /**
- *
+ * Main Class for DMRServer
  */
 public class DMRServer implements Runnable {
-	public static int DEBUG = 1;
+	public static Logger logger = Logger.getLogger();
+
 	public static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-KKmmss");
 
 	public static boolean enableCapture = false;
@@ -47,38 +50,64 @@ public class DMRServer implements Runnable {
 		this.local_socket = new DatagramSocket(local_port, local_host);
 
 		replayTimer = new Timer(true);
+		
+		//10 sec purge cycle for expired sessions
+		replayTimer.schedule(new PurgeTask(this), 10000,10000);
 
 		sessionMap = new HashMap<DMRSessionKey, DMRSession>();
 	}
 
+	public HashMap<DMRSessionKey, DMRSession> getSessionMap() {
+		return sessionMap;
+	}
+
+	public  synchronized void putSession(DMRSessionKey key, DMRSession session) {
+		sessionMap.put(key, session);
+	}
+	
+	public synchronized void removeSession(DMRSessionKey key) {
+		sessionMap.remove(key);
+	}
+	
 	public void setEncryption(Encryption encryption) {
 		this.encryption = encryption;
 	}
 
+	public boolean isSameAddr(InetAddress a1, InetAddress a2) {
+		boolean ret = false;
+		if (a1 != null && a2 != null) {
+			return a1.getHostAddress().equals(a2.getHostAddress());
+		}
+		return ret;
+	}
+
 	public void forward(DatagramPacket packet) {
-		String srcHost = packet.getAddress().getHostAddress();
+		InetAddress srcHost = packet.getAddress();
 		int srcPort = packet.getPort();
 		ArrayList<DMRSessionKey> purgeList = null;
-		for (DMRSessionKey key : sessionMap.keySet()) {
+		Set<DMRSessionKey> keySet = new HashSet<DMRSessionKey>() ;
+		keySet.addAll(sessionMap.keySet()) ;	
+		for (DMRSessionKey key : keySet) {
 			try {
 				DMRSession session = sessionMap.get(key);
+				if (session != null) {
+					if (!session.isExpired()) {
+						// filter self
+						if (srcPort != session.getPort() || !isSameAddr(srcHost, session.getAddress())) {
+							packet.setPort(session.getPort());
+							packet.setAddress(session.getAddress());
 
-				if (!session.isExpired()) {
-					// filter self
-					if (srcPort != session.getPort() || !srcHost.equals(session.getAddress().getHostAddress())) {
-						packet.setPort(session.getPort());
-						packet.setAddress(session.getAddress());
+							if (session.isEncrypted()) {
+								encrypt(packet);
+							}
 
-						if (session.isEncrypted()) {
-							encrypt(packet);
+							session.sendPacket(packet);
 						}
-
-						session.sendPacket(packet);
+					} else {
+						if (purgeList == null)
+							purgeList = new ArrayList<DMRSessionKey>();
+						purgeList.add(key);
 					}
-				} else {
-					if (purgeList == null)
-						purgeList = new ArrayList<DMRSessionKey>();
-					purgeList.add(key);
 				}
 			} catch (Exception ex) {
 				ex.printStackTrace();
@@ -87,7 +116,7 @@ public class DMRServer implements Runnable {
 
 		if (purgeList != null) {
 			for (DMRSessionKey key : purgeList)
-				sessionMap.remove(key);
+				removeSession(key);
 		}
 	}
 
@@ -136,14 +165,14 @@ public class DMRServer implements Runnable {
 	public void encrypt(DatagramPacket ret) {
 		byte[] bar = ret.getData();
 		int len = ret.getLength();
-		if (DEBUG > 1)
-			System.out.print("encrypt: in: " + len + " ");
+		if (logger.log(2))
+			logger.log("encrypt: in: " + len + " ");
 		bar = encryption.encrypt(bar, 0, len);
 		ret.setData(bar);
 		ret.setLength(bar.length);
 
-		if (DEBUG > 1)
-			System.out.println("out: " + bar.length);
+		if (logger.log(2))
+			logger.log("out: " + bar.length);
 	}
 
 	public DatagramPacket getResponse(DMRSession session, DatagramPacket packet) {
@@ -157,7 +186,8 @@ public class DMRServer implements Runnable {
 		if (tag.equals("vprn0000")) {
 			session.setEncrypt();
 			if (encryption == null) {
-				System.out.println("Encryption Key not enabled");
+				if (logger.log(1))
+					logger.log("Encryption Key not enabled");
 				return null;
 			}
 			len = decrypt(packet);
@@ -165,7 +195,8 @@ public class DMRServer implements Runnable {
 		}
 
 		DMRDecode dec = new DMRDecode(bar, len);
-		System.out.println("received: " + len + " " + dec.toString());
+		if (logger.log(2))
+			logger.log(1, "received: " + len + " " + dec.toString());
 
 		tag = dec.getTag();
 
@@ -188,8 +219,9 @@ public class DMRServer implements Runnable {
 		} else if (tag.equals("RPTC")) { // config or //close
 			if (bar[4] == 'L') {
 				// close
-				System.out.println("Closing Session: " + session.getKey());
-				sessionMap.remove(session.getKey());
+				if (logger.log(1))
+					logger.log("Closing Session: " + session.getKey());
+				removeSession(session.getKey());
 				byte[] resp = getAck(bar);
 				packet.setData(resp);
 				packet.setLength(resp.length);
@@ -224,7 +256,8 @@ public class DMRServer implements Runnable {
 								capture.log(fname);
 							}
 							if (enableReplay) {
-								System.out.println("Schedule replay in 5s");
+								if (logger.log(1))
+									logger.log("Schedule replay in 5s");
 								scheduleReplay(capture, REPLAY_TIMEOUT);
 							}
 							session.resetCapture();
@@ -244,7 +277,8 @@ public class DMRServer implements Runnable {
 
 		if (ret != null) {
 			dec = new DMRDecode(ret.getData(), ret.getLength());
-			System.out.println("sent: " + dec.toString());
+			if (logger.log(1))
+				logger.log("sent: " + dec.toString());
 
 			if (session.isEncrypted()) {
 				encrypt(ret);
@@ -263,9 +297,10 @@ public class DMRServer implements Runnable {
 		DMRSessionKey key = new DMRSessionKey(address, port);
 		DMRSession session = sessionMap.get(key);
 		if (session == null) {
-			System.out.println("Creating Session " + key);
+			if (logger.log(1))
+				logger.log("Creating Session " + key);
 			session = new DMRSession(key, address, port);
-			sessionMap.put(key, session);
+			putSession(key, session);
 		}
 		return session;
 	}
@@ -390,7 +425,14 @@ public class DMRServer implements Runnable {
 				enableReplay = true;
 			}
 
-			DMRServer server = new DMRServer(port, InetAddress.getByName(args[1]));
+			String ip = "0.0.0.0";
+			if (Arrays.asList(args).contains("-ip")) {
+				String sip = getArg(args, "-ip");
+				if (sip != null)
+					ip = sip;
+			}
+
+			DMRServer server = new DMRServer(port, InetAddress.getByName(ip));
 			Thread th = new Thread(server);
 			th.start();
 
