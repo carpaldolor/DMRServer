@@ -8,7 +8,7 @@ Features:
 
 -No talkgroup configuration, we pass everything through
 
--Individual or sharded accesss passwords
+-Individual or shared passwords
 
 -----------------------------------------------------------------------------------------------
 
