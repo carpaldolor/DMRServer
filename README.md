@@ -1,4 +1,26 @@
-DMRServer is a simplified backend service for hosting private or personal DMR Talkgroups.  
+The DMRServer package contains a talk group host for private DMR Talkgroups, and a MultiConnect 
+Gateway to allow the MMDVM hotspot product to effective handle multiple DMR Services.  This 
+allows seamless use of multiple DMR providers like BM and TFIG, along with private TG hosts.
+
+See: Architecture.png
+
+Coming soon: Encryption from the MultiConnect gateway to the DMRServer TG hosts.
+
+![alt text](./Architecture.png)
+
+-----------------------------------------------------------------------------------------------
+
+Review the multi_connect.ini and MMDVM.ini files for configuration.
+
+MultiConnect Gateway Usage:  java -jar DMRMultiConnect.jar
+
+#for debug output add the dmr.logger.level flag
+
+java -Ddmr.logger.level=2  -jar DMRMultiConnect.jar -config multi_connect.ini
+
+-----------------------------------------------------------------------------------------------
+
+DMRServer private talkgroup host 
 
 -----------------------------------------------------------------------------------------------
 
@@ -21,7 +43,7 @@ You must have java installed to use this product.  You can type: java -version  
 
 Usage:
 
-java -jar DMRServer-1.0-executable.jar -port 62031
+java -jar DMRServer.jar -port 62031
 
 -----------------------------------------------------------------------------------------------
 

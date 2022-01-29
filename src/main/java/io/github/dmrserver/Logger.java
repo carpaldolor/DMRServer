@@ -32,7 +32,7 @@ public class Logger {
 	
 	
 	public boolean log(int lev) {
-		return lev >= level ;
+		return lev <= level ;
 	}
 	
 	public String join(Object[] sar) {

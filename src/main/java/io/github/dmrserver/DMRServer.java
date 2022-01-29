@@ -56,6 +56,12 @@ public class DMRServer implements Runnable {
 
 		sessionMap = new HashMap<DMRSessionKey, DMRSession>();
 	}
+	
+	
+	public DMRServer()  {
+		sessionMap = new HashMap<DMRSessionKey, DMRSession>();
+	}	
+	
 
 	public HashMap<DMRSessionKey, DMRSession> getSessionMap() {
 		return sessionMap;
@@ -120,7 +126,7 @@ public class DMRServer implements Runnable {
 		}
 	}
 
-	public void addToBytes(byte[] bar, int pos, String msg) {
+	public static void addToBytes(byte[] bar, int pos, String msg) {
 		byte[] b = msg.getBytes();
 		System.arraycopy(b, 0, bar, pos, b.length);
 	}
