@@ -3,7 +3,9 @@ package io.github.dmrserver;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 
 /*
@@ -17,8 +19,8 @@ import java.util.HashMap;
 *
 */
 public class DMRAuth {
-	public static Logger logger = Logger.getLogger() ;
-	
+	public static Logger logger = Logger.getLogger();
+
 	private static DMRAuth _instance = null;
 	public static String filename = "auth.properties";
 
@@ -62,17 +64,10 @@ public class DMRAuth {
 			if ((salt == -1) || (auth == null) || ((bar.length - pos) < 32))
 				return false;
 
-			byte[] authBytes = auth.getBytes();
+			byte[] hash = getHash(auth, salt);
 
-			byte[] sha = new byte[authBytes.length + 4];
-			DMRDecode.intToBytes(salt, sha, 0);
-			System.arraycopy(authBytes, 0, sha, 4, authBytes.length);
-			if( logger.log(2) ) logger.log("checkAuth sha bytes: " + DMRDecode.hex(sha, 0, sha.length));
-
-			MessageDigest digest = MessageDigest.getInstance("SHA-256");
-			byte[] hash = digest.digest(sha);
-
-			if( logger.log(2) ) logger.log("checkAuth hash bytes: " + DMRDecode.hex(hash, 0, hash.length));
+			if (logger.log(2))
+				logger.log("checkAuth hash bytes: " + DMRDecode.hex(hash, 0, hash.length));
 
 			for (int i = 0; i < 32; i++)
 				if (hash[i] != bar[i + pos])
@@ -84,13 +79,30 @@ public class DMRAuth {
 		return false;
 	}
 
+	public static byte[] getHash(String auth, int salt) throws NoSuchAlgorithmException {
+		if (logger.log(2))
+			logger.log("getHash auth: " +auth+" "+salt);
+		byte[] authBytes = auth.getBytes(StandardCharsets.UTF_8);
+
+		byte[] sha = new byte[authBytes.length + 4];
+		DMRDecode.intToBytes(salt, sha, 0);
+		System.arraycopy(authBytes, 0, sha, 4, authBytes.length);
+		if (logger.log(2))
+			logger.log("getHash sha bytes: " + DMRDecode.hex(sha, 0, sha.length));
+		MessageDigest digest = MessageDigest.getInstance("SHA-256");
+		byte[] hash = digest.digest(sha);		
+		if (logger.log(2))
+			logger.log("getHash hash bytes: " + DMRDecode.hex(hash, 0, hash.length));
+		return hash;
+	}
+
 	public void load() {
 		try {
 			BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(filename)));
 			String line = null;
 			while ((line = br.readLine()) != null) {
 				line = line.trim();
-				if (!line.startsWith("#") && line.length()>0) {
+				if (!line.startsWith("#") && line.length() > 0) {
 					String[] sar = line.split("=");
 					if (sar.length == 2) {
 						if (sar[0].endsWith("*")) {

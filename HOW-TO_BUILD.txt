@@ -1,0 +1,15 @@
+
+#You need Java openjdk and maven installed
+
+sudo apt install maven
+sudo apt install openjdk-11-jdk
+
+
+
+#to build
+
+mvn package
+
+
+#jars are deposited in the ./target/ directory
+
