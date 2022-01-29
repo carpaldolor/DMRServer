@@ -12,9 +12,8 @@ public class DMRSession {
 
 	int salt = -1;
 	boolean isAuthenticated = false;
-	boolean supportEncryption = false;
 
-	long expiration = 300000L;
+	long expiration = 60000L;
 	long ts = 0L;
 
 	DMRSessionKey key;
@@ -35,13 +34,6 @@ public class DMRSession {
 		salt = -1;
 	}
 
-	public void setEncrypt() {
-		supportEncryption = true;
-	}
-
-	public boolean isEncrypted() {
-		return supportEncryption;
-	}
 
 	public boolean isTcp() {
 		return (tcpSocket != null);

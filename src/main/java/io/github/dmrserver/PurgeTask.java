@@ -16,7 +16,7 @@ public class PurgeTask extends TimerTask {
 
 	@Override
 	public void run() {
-		logger.log("PurgeTask: " + new Date());
+		int cnt =0;
 		try {
 			Set<DMRSessionKey> keySet = new HashSet<DMRSessionKey>();
 			keySet.addAll(server.getSessionMap().keySet());
@@ -24,8 +24,10 @@ public class PurgeTask extends TimerTask {
 				DMRSession session = server.getSessionMap().get(key);
 				if (session != null && session.isExpired()) {
 					server.removeSession(key);
+					cnt++ ;
 				}
 			}
+			if(cnt>0) logger.log("PurgeTask cnt: "+cnt) ;
 
 		} catch (Exception ex) {
 			Logger.handleException(ex);

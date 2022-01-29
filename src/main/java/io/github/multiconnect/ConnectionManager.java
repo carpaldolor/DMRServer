@@ -18,7 +18,7 @@ public class ConnectionManager implements Runnable {
 
 	public static long IDLE_TALKER_TIMEOUT = 1000;
 
-	DatagramSocket clientSocket;
+	DatagramSocket hotspotSocket;
 	ServiceConfig config;
 
 	DMRSession clientSession = null;
@@ -62,7 +62,7 @@ public class ConnectionManager implements Runnable {
 			if (localPort != null) {
 				port = Integer.parseInt(localPort);
 			}
-			clientSocket = new DatagramSocket(port);
+			hotspotSocket = new DatagramSocket(port);
 			System.out.println("Opening a listener on port: " + port);
 
 			Thread th = new Thread(this);
@@ -135,7 +135,7 @@ public class ConnectionManager implements Runnable {
 		if (clientSession == null) {
 			DMRSessionKey key = new DMRSessionKey(srcAddr, port);
 			clientSession = new DMRSession(key, srcAddr, port);
-			clientSession.setUdpSocket(clientSocket);
+			clientSession.setUdpSocket(hotspotSocket);
 			logger.log("Creating Session " + key);
 		}
 
@@ -153,7 +153,7 @@ public class ConnectionManager implements Runnable {
 	}
 
 	/**
-	 * Packet outgoing from a service connection
+	 * DMRD Packet outgoing from a service connection
 	 */
 	public synchronized void handleOutgoing(DatagramPacket packet, ServiceConnection sender) {
 		DMRDecode decode = new DMRDecode(packet);
@@ -162,7 +162,7 @@ public class ConnectionManager implements Runnable {
 		// ongoing conv
 		if (decode.getSrc() == currentTalker || sender.allowBreaking() ) {
 			currentTalker = decode.getSrc();
-			send(packet);
+			send(packet);			
 			if( decode.getFrame()==1)
 				logger.log(sender.getName() + " SENT outgoing: " + decode);
 			if (logger.log(2)) logger.log(sender.getName() + " SENT outgoing: " + decode);
@@ -199,7 +199,7 @@ public class ConnectionManager implements Runnable {
 			if (currentSession != null) {
 				packet.setAddress(currentSession.getAddress());
 				packet.setPort(currentSession.getPort());
-				clientSocket.send(packet);
+				hotspotSocket.send(packet);
 			}
 		} catch (Exception ex) {
 			Logger.handleException(ex);
@@ -212,8 +212,8 @@ public class ConnectionManager implements Runnable {
 		DatagramPacket packet = new DatagramPacket(bar, bar.length);
 		while (true) {
 			try {
-				packet.setData(bar);
-				clientSocket.receive(packet);
+				packet.setData(bar);				
+				hotspotSocket.receive(packet);
 				handlePacket(packet);
 			} catch (Exception ex) {
 				Logger.handleException(ex);

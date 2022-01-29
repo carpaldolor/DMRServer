@@ -65,7 +65,7 @@ public class DMRDecode {
 			rpt = ti(bar, 11, 4) ;
 			stream = ti(bar, 16, 4) ;
 			
-			ret = "DMRD seq:" + ti_pad(bar[4]) + " src:" + src + " dst:" +dst+ " rpt:"
+			ret = "len: "+len+" DMRD seq:" + ti_pad(bar[4]) + " src:" + src + " dst:" +dst+ " rpt:"
 					+ rpt + " slot:" + slot + " strm:" + stream + " data:" + (len - 20) + " frame:"
 					+ frameName[frame] + " " + st;
 		} else if (tag.equals("RPTP")) {
