@@ -50,31 +50,33 @@ public class DMRServer implements Runnable {
 		this.local_socket = new DatagramSocket(local_port, local_host);
 
 		replayTimer = new Timer(true);
-		
-		//10 sec purge cycle for expired sessions
-		replayTimer.schedule(new PurgeTask(this), 10000,10000);
+
+		// 10 sec purge cycle for expired sessions
+		replayTimer.schedule(new PurgeTask(this), 10000, 10000);
 
 		sessionMap = new HashMap<DMRSessionKey, DMRSession>();
 	}
-	
-	
-	public DMRServer()  {
+
+	public DMRServer() {
 		sessionMap = new HashMap<DMRSessionKey, DMRSession>();
-	}	
-	
+	}
+
+	public boolean isSecure() {
+		return encryption != null;
+	}
 
 	public HashMap<DMRSessionKey, DMRSession> getSessionMap() {
 		return sessionMap;
 	}
 
-	public  synchronized void putSession(DMRSessionKey key, DMRSession session) {
+	public synchronized void putSession(DMRSessionKey key, DMRSession session) {
 		sessionMap.put(key, session);
 	}
-	
+
 	public synchronized void removeSession(DMRSessionKey key) {
 		sessionMap.remove(key);
 	}
-	
+
 	public void setEncryption(Encryption encryption) {
 		this.encryption = encryption;
 	}
@@ -91,8 +93,8 @@ public class DMRServer implements Runnable {
 		InetAddress srcHost = packet.getAddress();
 		int srcPort = packet.getPort();
 		ArrayList<DMRSessionKey> purgeList = null;
-		Set<DMRSessionKey> keySet = new HashSet<DMRSessionKey>() ;
-		keySet.addAll(sessionMap.keySet()) ;	
+		Set<DMRSessionKey> keySet = new HashSet<DMRSessionKey>();
+		keySet.addAll(sessionMap.keySet());
 		for (DMRSessionKey key : keySet) {
 			try {
 				DMRSession session = sessionMap.get(key);
@@ -102,10 +104,6 @@ public class DMRServer implements Runnable {
 						if (srcPort != session.getPort() || !isSameAddr(srcHost, session.getAddress())) {
 							packet.setPort(session.getPort());
 							packet.setAddress(session.getAddress());
-
-							if (session.isEncrypted()) {
-								encrypt(packet);
-							}
 
 							session.sendPacket(packet);
 						}
@@ -154,50 +152,23 @@ public class DMRServer implements Runnable {
 		return ret;
 	}
 
-	public int decrypt(DatagramPacket ret) {
-		byte[] bar = ret.getData();
-		int len = ret.getLength();
-
-		byte[] plain = encryption.decrypt(bar, 8, len - 8);
-		for (int i = 0; i < plain.length; i++)
-			bar[i] = plain[i];
-		bar[plain.length] = 0;
-
-		ret.setData(plain);
-		ret.setLength(plain.length);
-		return plain.length;
-	}
-
-	public void encrypt(DatagramPacket ret) {
-		byte[] bar = ret.getData();
-		int len = ret.getLength();
-		if (logger.log(2))
-			logger.log("encrypt: in: " + len + " ");
-		bar = encryption.encrypt(bar, 0, len);
-		ret.setData(bar);
-		ret.setLength(bar.length);
-
-		if (logger.log(2))
-			logger.log("out: " + bar.length);
-	}
-
 	public DatagramPacket getResponse(DMRSession session, DatagramPacket packet) {
 		DatagramPacket ret = null;
 		byte[] bar = packet.getData();
 		int len = packet.getLength();
 
-		String tag = new String(bar, 0, 8);
+		String tag = new String(bar, 0, 4);
 
-		// handle encrypted packets
-		if (tag.equals("vprn0000")) {
-			session.setEncrypt();
-			if (encryption == null) {
-				if (logger.log(1))
-					logger.log("Encryption Key not enabled");
+		// handle encrypted packets, decrypt all but DMRD
+		// those are encrypted with a different key at the source
+		if (isSecure() && !tag.equals("DMRD")) {
+			if (!encryption.decryptPacket(packet)) {
+				// decrypt error
 				return null;
 			}
-			len = decrypt(packet);
+
 			bar = packet.getData();
+			len = packet.getLength();
 		}
 
 		DMRDecode dec = new DMRDecode(bar, len);
@@ -286,8 +257,8 @@ public class DMRServer implements Runnable {
 			if (logger.log(1))
 				logger.log("sent: " + dec.toString());
 
-			if (session.isEncrypted()) {
-				encrypt(ret);
+			if (isSecure()) {
+				encryption.encryptPacket(ret);
 			}
 		}
 
@@ -353,6 +324,16 @@ public class DMRServer implements Runnable {
 	public static void monitor(DMRServer server) {
 		HashMap<String, String> filesMap = new HashMap<>();
 		Console console = System.console();
+		
+		if (console == null) {
+			// wait here forever, may not be one
+			synchronized (DMRServer.class) {
+				try {
+					DMRServer.class.wait();
+				} catch (InterruptedException e) {
+				}
+			}
+		}
 
 		while (true) {
 			String line = console.readLine(">").trim();
@@ -412,12 +393,12 @@ public class DMRServer implements Runnable {
 	}
 
 	public static void checkFiles() {
-		File f=new File(DMRAuth.filename) ;
-		if( ! f.exists()) {
-			exitOnError("Missing required file: auth.properties, see documentation");			
+		File f = new File(DMRAuth.filename);
+		if (!f.exists()) {
+			exitOnError("Missing required file: auth.properties, see documentation");
 		}
 	}
-	
+
 	public static void main(String[] args) {
 		try {
 
@@ -444,16 +425,16 @@ public class DMRServer implements Runnable {
 				if (sip != null)
 					ip = sip;
 			}
-			
-			checkFiles() ;
-			
+
+			checkFiles();
+
 			DMRServer server = new DMRServer(port, InetAddress.getByName(ip));
 			Thread th = new Thread(server);
 			th.start();
 
-			String key = getArg(args, "-key");
+			String key = getArg(args, "-serverkey");
 			if (key != null) {
-				server.setEncryption(new Encryption(key));
+				server.setEncryption(new Encryption(key.trim()));
 			}
 
 			if (Arrays.asList(args).contains("-tcp")) {

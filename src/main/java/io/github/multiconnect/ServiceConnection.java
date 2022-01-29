@@ -11,10 +11,13 @@ import java.util.HashMap;
 import io.github.dmrserver.DMRAuth;
 import io.github.dmrserver.DMRDecode;
 import io.github.dmrserver.DMRServer;
+import io.github.dmrserver.Encryption;
 import io.github.dmrserver.Logger;
 
 public class ServiceConnection implements Runnable {
 	public static Logger logger = Logger.getLogger();
+
+	boolean isAuthenticated = false;
 
 	long lastHeard = 0;
 
@@ -24,9 +27,12 @@ public class ServiceConnection implements Runnable {
 	InetAddress remoteAddress;
 	int remotePort;
 
-	boolean allowBreakin = false ;
-	
+	boolean allowBreakin = false;
+
 	int repeaterId = 0;
+
+	Encryption serverEncryption = null;
+	Encryption clientEncryption = null;
 
 	public ServiceConnection(ConfigSection config) {
 		this.config = config;
@@ -41,33 +47,52 @@ public class ServiceConnection implements Runnable {
 		remotePort = config.getIntParam(ConfigSection.REMOTE_PORT);
 		markTime();
 
-		allowBreakin = config.checkVal("Breakin", "1") ;
+		allowBreakin = config.checkVal("Breakin", "1");
+
+		String serverKey = config.getParam(ConfigSection.SERVER_KEY);
+		String clientKey = config.getParam(ConfigSection.CLIENT_KEY);
+		if (serverKey != null && clientKey != null) {
+			serverEncryption = new Encryption(serverKey.trim());
+			clientEncryption = new Encryption(clientKey.trim());
+		}
 	}
-	
+
+	public boolean isSecure() {
+		return clientEncryption != null;
+	}
+
+	public Encryption getServerEncryption() {
+		return serverEncryption;
+	}
+
+	public Encryption getClientEncryption() {
+		return clientEncryption;
+	}
+
 	public String getName() {
 		return config.getName();
 	}
 
 	public boolean allowBreaking() {
-		return allowBreakin ;
+		return allowBreakin;
 	}
-	
+
 	public HashMap<Integer, ServiceConnection> getRoutes() {
 		HashMap<Integer, ServiceConnection> ret = new HashMap<Integer, ServiceConnection>();
 		String val = config.getParam(ConfigSection.TGLIST);
 		String[] sar = val.split(",");
 		for (int i = 0; i < sar.length; i++) {
 			try {
-				int key ;
-				if(sar[i].trim().equals("*") )
-					key = 0 ;
+				int key;
+				if (sar[i].trim().equals("*"))
+					key = 0;
 				else
 					key = Integer.parseInt(sar[i].trim());
 				ret.put(key, this);
-				if(key==0 )
-					logger.log( config.getName()+" adding DEFAULT") ;
+				if (key == 0)
+					logger.log(config.getName() + " adding DEFAULT");
 				else
-					logger.log( config.getName()+" adding TG "+key) ;
+					logger.log(config.getName() + " adding TG " + key);
 			} catch (Exception ex) {
 			}
 		}
@@ -99,7 +124,7 @@ public class ServiceConnection implements Runnable {
 		DMRServer.addToBytes(bar, 0, "RPTL");
 		DMRDecode.intToBytes(repeaterId, bar, 4);
 		packet.setLength(8);
-		send(packet);
+		send(packet, false);
 	}
 
 	public void sendLoginAuth(DatagramPacket packet, int salt) throws NoSuchAlgorithmException {
@@ -108,11 +133,10 @@ public class ServiceConnection implements Runnable {
 		DMRDecode.intToBytes(repeaterId, bar, 4);
 
 		String auth = config.getParam(ConfigSection.PASSWORD);
-		logger.log("password: " + auth);
 		byte[] hash = DMRAuth.getHash(auth, salt);
 		System.arraycopy(hash, 0, bar, 8, hash.length);
 		packet.setLength(8 + hash.length);
-		send(packet);
+		send(packet, false);
 	}
 
 	public void sendLoginConfig(DatagramPacket packet) {
@@ -122,14 +146,21 @@ public class ServiceConnection implements Runnable {
 		String confMsg = config.getMessage();
 		DMRServer.addToBytes(bar, 8, confMsg);
 		packet.setLength(8 + confMsg.length());
-		send(packet);
+		send(packet, false);
 	}
 
 	/**
 	 * Send a packet to the remote server
 	 */
-	public void send(DatagramPacket packet) {
+	public void send(DatagramPacket packet, boolean isData) {
 		try {
+			if (isSecure()) {
+				if (isData) {
+					clientEncryption.encryptPacket(packet);
+				} else {
+					serverEncryption.encryptPacket(packet);
+				}
+			}
 			packet.setAddress(remoteAddress);
 			packet.setPort(remotePort);
 			remoteSocket.send(packet);
@@ -139,16 +170,19 @@ public class ServiceConnection implements Runnable {
 	}
 
 	public void handleDataPacket(DatagramPacket packet, DMRDecode decode) {
-		logger.log(config.getName()+" Data: "+decode) ;
-		send(packet) ;
+		logger.log(config.getName() + " Data: " + decode);
+		send(packet, true);
 	}
-	
+
 	public DatagramPacket waitForResponse(DatagramPacket packet) {
 		try {
 			byte[] bar = new byte[2048];
 			packet.setData(bar);
 			remoteSocket.setSoTimeout(2000);
 			remoteSocket.receive(packet);
+			if (isSecure()) {
+				serverEncryption.decryptPacket(packet);
+			}
 			return packet;
 		} catch (Exception ex) {
 			Logger.handleException(ex);
@@ -173,35 +207,55 @@ public class ServiceConnection implements Runnable {
 	}
 
 	public boolean login(DatagramPacket packet) {
-		try {
+		logger.log("Starting login to Service: " + config.getName());
 
-			// send init
-			sendLoginInit(packet);
-			if ((packet = waitForResponse(packet)) == null)
-				return false;
-			int salt = getAckSalt(packet);
-			if (salt == -1)
-				return false;
+		long waitTime = 1000;
+		while (!isAuthenticated) {
 
-			// send auth
-			sendLoginAuth(packet, salt);
-			if ((packet = waitForResponse(packet)) == null)
-				return false;
-			if (!isAck(packet))
-				return false;
+			try {
+				// send init
+				sendLoginInit(packet);
+				if ((packet = waitForResponse(packet)) != null) {
 
-			// send config
-			sendLoginConfig(packet);
-			if ((packet = waitForResponse(packet)) == null)
-				return false;
-			if (!isAck(packet))
-				return false;
+					int salt = getAckSalt(packet);
+					if (salt == -1)
+						return false;
 
-			return true;
-		} catch (Exception ex) {
-			Logger.handleException(ex);
+					// send auth
+					sendLoginAuth(packet, salt);
+					if ((packet = waitForResponse(packet)) == null)
+						return false;
+					if (!isAck(packet))
+						return false;
+
+					// send config
+					sendLoginConfig(packet);
+					if ((packet = waitForResponse(packet)) == null)
+						return false;
+					if (!isAck(packet))
+						return false;
+
+					isAuthenticated = true;
+				}
+			} catch (Exception ex) {
+				Logger.handleException(ex);
+			}
+
+			// wait before trying again
+			if (!isAuthenticated) {
+				try {
+					logger.log(getName() + " Server is not responding.");
+					Thread.sleep(waitTime);
+					waitTime = waitTime * 2L;
+					if (waitTime > 300000L)
+						waitTime = 300000L;
+				} catch (Exception ex) {
+				}
+			}
+
 		}
-		return false;
+
+		return isAuthenticated;
 	}
 
 	/**
@@ -214,7 +268,7 @@ public class ServiceConnection implements Runnable {
 			DMRServer.addToBytes(bar, 0, "RPTPING");
 			DMRDecode.intToBytes(repeaterId, bar, 7);
 			DatagramPacket packet = new DatagramPacket(bar, 11);
-			send(packet);
+			send(packet, false);
 		} catch (Exception ex) {
 			Logger.handleException(ex);
 		}
@@ -225,18 +279,39 @@ public class ServiceConnection implements Runnable {
 		markTime();
 	}
 
+	public void handleNAK() {
+		logger.log(config.getName() + " MSTNAK  Connect is reset");
+		isAuthenticated = false;
+		byte[] bar = new byte[2048];
+		DatagramPacket packet = new DatagramPacket(bar, bar.length);
+		login(packet);
+	}
+
 	public void handlePacket(DatagramPacket packet) throws IOException {
 
 		byte[] bar = packet.getData();
 		int len = packet.getLength();
-		// logger.log(1, "received: " + len + " " + DMRDecode.hex(bar, 0, len) );
-		String tag = new String(bar, 0, 4);
 
-		if( logger.log(2) ) logger.log(config.getName() + " handlePacket() " + tag + " " + packet.getAddress().getHostAddress() + ":"
-				+ packet.getPort());
+		String tag = new String(bar, 0, 4);
+		if (logger.log(2))
+			logger.log("handlePacket() " + tag + " len: " + packet.getLength());
+
+		if (isSecure()) {
+			if (tag.equals("DMRD")) {
+				clientEncryption.decryptPacket(packet);
+			} else {
+				serverEncryption.decryptPacket(packet);
+			}
+		}
+
+		if (logger.log(2))
+			logger.log(config.getName() + " handlePacket() " + tag + " " + packet.getAddress().getHostAddress() + ":"
+					+ packet.getPort());
 
 		if (tag.equals("MSTP")) {
 			handlePong();
+		} else if (tag.equals("MSTN")) {
+			handleNAK();
 		} else if (conMan != null && tag.equals("DMRD")) {
 			conMan.handleOutgoing(packet, this);
 		}
@@ -244,31 +319,35 @@ public class ServiceConnection implements Runnable {
 	}
 
 	public void run() {
+		byte[] bar = new byte[2048];
+		DatagramPacket packet = new DatagramPacket(bar, bar.length);
 		try {
-			byte[] bar = new byte[2048];
-			DatagramPacket packet = new DatagramPacket(bar, bar.length);
 			InetAddress addr = InetAddress.getByName(config.getParam(ConfigSection.REMOTE_IP));
 			packet.setAddress(addr);
 			int port = config.getIntParam(ConfigSection.LOCAL_PORT);
 			packet.setPort(port);
 
-			logger.log("Starting login to Service: " + config.getName());
-			boolean ret = login(packet);
-			logger.log("login status: " + ret);
-
-			remoteSocket.setSoTimeout(0);
+			isAuthenticated = login(packet);
+			logger.log("login status: " + isAuthenticated);
 
 			packet = new DatagramPacket(bar, bar.length);
-
-			while (true) {
-				packet.setAddress(remoteAddress);
-				packet.setPort(remotePort);
-				remoteSocket.receive(packet);
-				handlePacket(packet);
-
-			}
 		} catch (Exception ex) {
 			Logger.handleException(ex);
+		}
+
+		while (true) {
+			try {
+				remoteSocket.setSoTimeout(0);
+				packet.setAddress(remoteAddress);
+				packet.setPort(remotePort);
+				packet.setData(bar);
+				remoteSocket.receive(packet);
+				if (isAuthenticated) {
+					handlePacket(packet);
+				}
+			} catch (Exception ex) {
+				Logger.handleException(ex);
+			}
 		}
 	}
 

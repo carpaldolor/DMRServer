@@ -1,5 +1,6 @@
 package io.github.dmrserver;
 
+import java.net.DatagramPacket;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
@@ -10,7 +11,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 public class Encryption {
 	public static Logger logger = Logger.getLogger();
-	
+
 	public static final int SHA256_BLOCK_SIZE = 32;
 	public static final String algorithm = "AES/CBC/NoPadding";
 
@@ -40,7 +41,7 @@ public class Encryption {
 	}
 
 	public static IvParameterSpec generateIv(String key) {
-		byte[] iv = reHash(key, 1000);
+		byte[] iv = reHash(key, 11000);
 		return new IvParameterSpec(iv, 0, 16);
 	}
 
@@ -53,6 +54,64 @@ public class Encryption {
 	public void init(String key) {
 		secretkey = createKey(key);
 		iv = generateIv(key);
+	}
+
+	/**
+	 * Encrypt/Decrypt all but the first 4 chars. DMRD message will not be touched,
+	 * as they are encrypted already by the sender. The server only needs the
+	 * ping,pong,login messages
+	 */
+	public boolean decryptPacket(DatagramPacket ret) {
+		byte[] bar = ret.getData();
+		int len = ret.getLength();
+
+		if ((len - 4) % 16 != 0) {
+			if (logger.log(5))
+				logger.log("decryptPacket() REJECTED len:" +ret.getLength()+" " + DMRDecode.hex(bar, 0, len));
+			return false;
+		}
+		else {
+			if (logger.log(5))
+				logger.log("decryptPacket() in  " + DMRDecode.hex(bar, 0, len));			
+		}
+
+		byte[] plain = decrypt(bar, 4, len - 4);
+		System.arraycopy(plain, 0, bar, 4, plain.length);
+
+		ret.setData(bar);
+		ret.setLength(4 + plain.length);
+
+		if (logger.log(5))
+			logger.log("decryptPacket() in  " + DMRDecode.hex(bar, 0, ret.getLength()));
+
+		return true;
+	}
+
+	public void encryptPacket(DatagramPacket ret) {
+		byte[] bar = ret.getData();
+		int len = ret.getLength();
+		if (logger.log(2)) {
+			logger.log("encryptPacket() in len: " + len);
+			if (logger.log(5)) {
+				logger.log("encryptPacket() in  " + DMRDecode.hex(bar, 0, len));
+			}
+		}
+		byte[] cipher = encrypt(bar, 4, len - 4);
+		byte[] newbar = new byte[cipher.length + 4];
+		System.arraycopy(bar, 0, newbar, 0, 4);
+		System.arraycopy(cipher, 0, newbar, 4, cipher.length);
+
+		ret.setData(newbar);
+		ret.setLength(newbar.length);
+
+		if (logger.log(2)) {
+			logger.log("encryptPacket() out len: " + newbar.length);
+			if (logger.log(5)) {
+				logger.log("encryptPacket() out  " + DMRDecode.hex(newbar, 0, newbar.length));
+				logger.log("encryptPacket() out  " + new String(ret.getData(), 0, newbar.length));
+			}
+
+		}
 	}
 
 	public byte[] decrypt(byte[] cipherText, int start, int len) {
@@ -117,26 +176,30 @@ public class Encryption {
 		String msg = args[2];
 
 		logger.log("string: " + key);
-		byte[] iv = reHash(key, 1000);
+		byte[] iv = reHash(key, 11000);
 		byte[] skey = reHash(key, 10000);
 		logger.log("iv: " + DMRDecode.hex(iv, 0, iv.length));
 		logger.log("key: " + DMRDecode.hex(skey, 0, skey.length));
 
 		Encryption enc = new Encryption(key);
 		if (oper.equals("-e")) {
+			DatagramPacket dp = new DatagramPacket(msg.getBytes(StandardCharsets.UTF_8), 0, msg.length());
 			enc.init(key);
-			byte[] encoded = enc.encrypt(msg.getBytes(StandardCharsets.UTF_8), 0, msg.length());
-			logger.log("cipher: " + encoded.length + " " + DMRDecode.hex(encoded, 0, encoded.length));
+			enc.encryptPacket(dp);
+			logger.log("cipher len:" + dp.getLength() + " msg: " + DMRDecode.hex(dp.getData(), 0, dp.getLength()));
 		}
 
 		if (oper.equals("-d")) {
 			msg = msg.trim().replaceAll("\\s*", "");
 
 			byte[] encoded = hexStringToByteArray(msg);
+			DatagramPacket dp = new DatagramPacket(encoded, encoded.length);
+
 			logger.log("encoded: " + DMRDecode.hex(encoded, 0, encoded.length));
 
-			byte[] decoded = enc.decrypt(encoded, 0, encoded.length);
-			logger.log("cipher: " + decoded.length + " " + new String(decoded));
+			enc.decryptPacket(dp);
+			byte[] decoded = dp.getData();
+			logger.log("cipher  len: " + dp.getLength() + " msg: " + new String(decoded, 0, dp.getLength()));
 		}
 
 	}
