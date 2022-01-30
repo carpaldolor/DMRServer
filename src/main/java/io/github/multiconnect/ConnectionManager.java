@@ -18,6 +18,8 @@ public class ConnectionManager implements Runnable {
 
 	public static long IDLE_TALKER_TIMEOUT = 1000;
 
+	public static Integer DEFAULT_ROUTE = 0 ;
+	
 	DatagramSocket hotspotSocket;
 	ServiceConfig config;
 
@@ -27,6 +29,7 @@ public class ConnectionManager implements Runnable {
 
 	HashMap<String, ServiceConnection> conMap = new HashMap<String, ServiceConnection>();
 	HashMap<Integer, ServiceConnection> routeMap = new HashMap<Integer, ServiceConnection>();
+	HashMap<Integer, ServiceConnection> selectorMap = new HashMap<Integer, ServiceConnection>();
 
 	int currentTalker = 0;
 	long lastTalk = 0;
@@ -87,6 +90,10 @@ public class ConnectionManager implements Runnable {
 				con.setConnectionManager(this);
 				conMap.put(key, con);
 				routeMap.putAll(con.getRoutes());
+				int selector = con.getSelector();
+				if(selector>0) {
+					selectorMap.put(selector, con) ;
+				}
 				con.start();
 			}
 		}
@@ -97,16 +104,31 @@ public class ConnectionManager implements Runnable {
 		int len = packet.getLength();
 		DMRDecode decode = new DMRDecode(bar, len);
 		int dst = decode.getDst();
-		ServiceConnection con = routeMap.get(dst);
-		if (con != null) {
-			con.handleDataPacket(packet, decode);
-		} else {
-			// check for a default route id=0
-			con = routeMap.get(0);
+		ServiceConnection con = selectorMap.get(dst);
+		if(con!=null) {
+			//dst id is a Selector
+			ServiceConnection defaultCon = routeMap.get(DEFAULT_ROUTE);
+			if(defaultCon==null || ! defaultCon.getName().equals(con.getName()) ) {
+				//select this connection as the default route
+				routeMap.put(DEFAULT_ROUTE, con) ;
+				logger.log("selector: "+dst+" Default Service has been changed to: "+con.getName()) ;
+			}			
+		}
+		else {
+			//route to appropriate service
+			con = routeMap.get(dst);
 			if (con != null) {
 				con.handleDataPacket(packet, decode);
-			}
+			} else {
+				// check for a default route id=0
+				con = routeMap.get(DEFAULT_ROUTE);
+				if (con != null) {
+					con.handleDataPacket(packet, decode);
+				}
+			}			
 		}
+			
+		
 	}
 
 	public void handlePacket(DatagramPacket packet) throws IOException {
