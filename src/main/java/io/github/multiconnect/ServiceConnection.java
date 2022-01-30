@@ -77,6 +77,15 @@ public class ServiceConnection implements Runnable {
 		return allowBreakin;
 	}
 
+	public int getSelector() {
+		int ret = 0;
+		try {
+			ret = config.getIntParam("Selector");
+		} catch (Exception ex) {
+		}
+		return ret;
+	}
+
 	public HashMap<Integer, ServiceConnection> getRoutes() {
 		HashMap<Integer, ServiceConnection> ret = new HashMap<Integer, ServiceConnection>();
 		String val = config.getParam(ConfigSection.TGLIST);
@@ -170,7 +179,14 @@ public class ServiceConnection implements Runnable {
 	}
 
 	public void handleDataPacket(DatagramPacket packet, DMRDecode decode) {
-		logger.log(config.getName() + " Data: " + decode);
+		//rewrite the repeater if needed
+		int rptr = decode.getRpt() ;
+		if( repeaterId!=rptr) {
+			//rewrite the repeater id
+			byte[] bar = packet.getData();
+			DMRDecode.intToBytes(repeaterId, bar,11) ;
+		}		
+		logger.log(config.getName() + " " +repeaterId+" Data: " + decode);
 		send(packet, true);
 	}
 
