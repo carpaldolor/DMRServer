@@ -4,7 +4,6 @@ allows seamless use of multiple DMR providers like BM and TFIG, along with priva
 
 See: Architecture.png
 
-Coming soon: Encryption from the MultiConnect gateway to the DMRServer TG hosts.
 
 ![alt text](./Architecture.png)
 
