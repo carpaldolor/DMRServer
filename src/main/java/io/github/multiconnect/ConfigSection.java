@@ -6,6 +6,7 @@ public class ConfigSection {
 	public static String[] INT_FIELDS = new String[] { "RemotePort" };
 
 	public static String LOCAL_PORT = "LocalPort";
+	public static String PING_TIME = "ping";
 	public static String REPEATER_ID = "repeaterid";
 	public static String REMOTE_IP = "RemoteAddress";
 	public static String REMOTE_PORT = "RemotePort";
