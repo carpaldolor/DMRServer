@@ -20,6 +20,10 @@ public class ServiceConfig {
 		return sectionMap.get(name);
 	}
 	
+	public ConfigSection getMain() {
+		return sectionMap.get(MAIN_SECTION);
+	}
+	
 	public HashMap<String, ConfigSection> getSectionMap() {
 		return sectionMap;
 	}

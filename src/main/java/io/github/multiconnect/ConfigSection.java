@@ -7,6 +7,8 @@ public class ConfigSection {
 
 	public static String LOCAL_PORT = "LocalPort";
 	public static String PING_TIME = "ping";
+	public static String IDLE_TALKER_TIMEOUT = "idle_talker_timeout";
+	public static String CHANNEL_RESERVE_TIMEOUT = "channel_reserve_timeout";
 	public static String REPEATER_ID = "repeaterid";
 	public static String REMOTE_IP = "RemoteAddress";
 	public static String REMOTE_PORT = "RemotePort";
@@ -34,9 +36,8 @@ public class ConfigSection {
 	}
 	public static Set<String> OTHER_REQUIRED = Set.of(REPEATER_ID, REMOTE_IP, REMOTE_PORT, PASSWORD, TGLIST);
 
-	public static Set<String> PAD_ZERO = Set.of("lat", "lon", "txfreq","rxfreq");
-	
-	
+	public static Set<String> PAD_ZERO = Set.of("lat", "lon", "txfreq", "rxfreq");
+
 	String name;
 
 	HashMap<String, String> params;
@@ -59,11 +60,11 @@ public class ConfigSection {
 		return val == null || val.equals("1");
 	}
 
-	public boolean checkVal( String field, String value) {
+	public boolean checkVal(String field, String value) {
 		String val = params.get("Breakin");
 		return val != null && val.equals(value);
 	}
-	
+
 	public HashMap<String, String> getParams() {
 		return params;
 	}
@@ -75,6 +76,14 @@ public class ConfigSection {
 	public int getIntParam(String name) {
 		String val = params.get(name);
 		return Integer.parseInt(val);
+	}
+
+	public int getIntParam(String name, int defaultValue) {
+		int ret = defaultValue;
+		String val = params.get(name);
+		if (val != null)
+			ret = Integer.parseInt(val);
+		return ret;
 	}
 
 	/*
@@ -130,9 +139,9 @@ public class ConfigSection {
 		appendString(sb, "location");
 		appendString(sb, "description");
 
-		//mode
+		// mode
 		appendString(sb, "mode");
-		
+
 		appendString(sb, "url");
 		appendString(sb, "softwareid");
 		appendString(sb, "packageid");
@@ -140,7 +149,7 @@ public class ConfigSection {
 	}
 
 	public String formatVal(String field, String val, int len) {
-		boolean pad_zero = PAD_ZERO.contains(field) ;
+		boolean pad_zero = PAD_ZERO.contains(field);
 		if (val.length() >= len) {
 			return val.substring(0, len);
 		} else {
@@ -148,7 +157,7 @@ public class ConfigSection {
 			StringBuffer sb = new StringBuffer(len);
 			sb.append(val);
 			for (int i = 0; i < (len - val.length()); i++) {
-				if(pad_zero)
+				if (pad_zero)
 					sb.append("0");
 				else
 					sb.append(" ");
