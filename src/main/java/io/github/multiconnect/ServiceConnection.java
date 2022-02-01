@@ -30,7 +30,9 @@ public class ServiceConnection implements Runnable {
 	boolean allowBreakin = false;
 
 	int repeaterId = 0;
-
+	int pingCount=0;
+	int pongCount=0;
+	
 	Encryption serverEncryption = null;
 	Encryption clientEncryption = null;
 
@@ -185,6 +187,15 @@ public class ServiceConnection implements Runnable {
 			//rewrite the repeater id
 			byte[] bar = packet.getData();
 			DMRDecode.intToBytes(repeaterId, bar,11) ;
+			
+			//May need a better way to tell a group from a person
+			//for now change to group for under 1M
+			if( decode.getDst() < 1000000 ) {
+				int type = decode.getType();
+				//set Group flag
+				bar[15] =  (byte) (type  & 0xBF) ;				
+			}
+			
 		}		
 		logger.log(config.getName() + " " +repeaterId+" Data: " + decode);
 		send(packet, true);
@@ -278,7 +289,8 @@ public class ServiceConnection implements Runnable {
 	 * Called by ServiceManager Timer
 	 */
 	public void handlePing() {
-		logger.log(config.getName() + " RPTPING");
+		pingCount++ ;
+		if(logger.log(2)) logger.log(config.getName() + " RPTPING");
 		try {
 			byte[] bar = new byte[11];
 			DMRServer.addToBytes(bar, 0, "RPTPING");
@@ -291,10 +303,20 @@ public class ServiceConnection implements Runnable {
 	}
 
 	public void handlePong() {
-		logger.log(config.getName() + " MSTPONG");
+		pongCount++ ;
+		if(logger.log(2)) logger.log(config.getName() + " MSTPONG");
 		markTime();
 	}
 
+	public void pingPongReset() {
+		pingCount=0;
+		pongCount=0;
+	}
+	
+	public String getPingPong() {
+		return "["+pingCount+":"+pongCount+"]" ;
+	}
+	
 	public void handleNAK() {
 		logger.log(config.getName() + " MSTNAK  Connect is reset");
 		isAuthenticated = false;
@@ -344,7 +366,7 @@ public class ServiceConnection implements Runnable {
 			packet.setPort(port);
 
 			isAuthenticated = login(packet);
-			logger.log("login status: " + isAuthenticated);
+			logger.log(getName()+" login status: " + isAuthenticated);
 
 			packet = new DatagramPacket(bar, bar.length);
 		} catch (Exception ex) {

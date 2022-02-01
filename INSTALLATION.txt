@@ -1,0 +1,56 @@
+========================================================================================================
+DMRServer
+========================================================================================================
+
+The DMRServer component provides self hosted TalkGroups with custom DMR user ids, that may be the same
+of different from radio assigned ids.  The password can be set to be either shared for all hotspot, 
+or administered for each user.
+
+The DMRServer can be installed on any server that will be reachable by the Hotspots that will connect.
+This would include public internet servers like AWS in the free tier for limited use, or other cloud
+server providers. If can also be installed on a desktop PC or Raspberrypi, and make accessable from the 
+internet by configuring incoming firewall rules on the designated port. (62031 by default).
+
+To run the DMRServer you need the following files on the target server:
+
+	DMRServer.jar
+	auth.properties
+
+The command line to run is:
+
+	java  -jar DMRServer.jar -port 62033 -serverkey abcdefghijk0123456789
+
+The serverkey is optional and only needed to provide encryption between the DMRMultiConnect component
+and the server.  It will not likely work when encryption is enabled with any other DMR 
+clients, like DROIDSTAR.  So leave this off if you need other types of clients to connect.
+You need to install the "openjdk-11-jdk" java package to run
+
+
+
+========================================================================================================
+DMRMultiConnect
+========================================================================================================
+
+The DMRMultiConnect component allows a Hotspot to subscribe to multiple DMR Talk Group hosts, including
+well known providers like Brandmeister and TGIF, and also supports multiple private DMRServer instances.  
+It is not limited to a number of services, but only 5-6 concurrent services have been tested so far.
+
+The DMRMultiConnect process can run on the same raspberrypi as the host spot, or on a different PC.  When 
+running on the same host, the IP is set to the local loopback 127.0.0.1 address.  For a seperate host, you 
+would need to configure the IP of the PC host.
+
+The required files are:
+
+	DMRMultiConnect.jar
+	auth.properties   (must have a password configured for MMDVMHost to connect)
+	multi_connect.ini
+
+The command line to run is:
+
+	java  -jar DMRMultiConnect.jar  -config multi_connect.ini
+
+
+If you run this on a pi-star, you need to install the "openjdk-11-jdk" java package to run.  You may need
+to use the expert configuration mode to add the IP address of you DMRMultiConnect.  It has also been 
+tested running on a stock raspberian OS pi with only the MMDVMHost package installed.  The included MMDVM.ini
+reference file will work in this mode, but many of the other web based pi-star services will not be available.
