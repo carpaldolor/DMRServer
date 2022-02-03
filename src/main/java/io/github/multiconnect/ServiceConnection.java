@@ -30,11 +30,14 @@ public class ServiceConnection implements Runnable {
 	boolean allowBreakin = false;
 
 	int repeaterId = 0;
-	int pingCount=0;
-	int pongCount=0;
-	
+	int pingCount = 0;
+	int pongCount = 0;
+
 	Encryption serverEncryption = null;
 	Encryption clientEncryption = null;
+
+	HashMap<Integer, Integer> transIn = null;
+	HashMap<Integer, Integer> transOut = null;
 
 	public ServiceConnection(ConfigSection config) {
 		this.config = config;
@@ -56,6 +59,30 @@ public class ServiceConnection implements Runnable {
 		if (serverKey != null && clientKey != null) {
 			serverEncryption = new Encryption(serverKey.trim());
 			clientEncryption = new Encryption(clientKey.trim());
+		}
+
+		configTranslation();
+	}
+
+	public void configTranslation() {
+		String val = config.getParam(ConfigSection.TGMAP);
+		if (val != null) {
+			transIn = new HashMap<Integer, Integer>();
+			transOut = new HashMap<Integer, Integer>();
+			String[] sar = val.split(",");
+			for (int i = 0; i < sar.length; i++) {
+				try {
+					String[] entry = sar[i].split(":");
+					int origtg = Integer.parseInt(entry[0]);
+					int alttg = Integer.parseInt(entry[1]);
+					transIn.put(origtg, alttg);
+					transOut.put(alttg, origtg);
+
+					logger.log(getName() + "  Mapping TG: " + origtg + " to Alt: " + alttg);
+				} catch (Exception ex) {
+					logger.log("Invalid TG Map:  " + sar[i]);
+				}
+			}
 		}
 	}
 
@@ -91,6 +118,7 @@ public class ServiceConnection implements Runnable {
 	public HashMap<Integer, ServiceConnection> getRoutes() {
 		HashMap<Integer, ServiceConnection> ret = new HashMap<Integer, ServiceConnection>();
 		String val = config.getParam(ConfigSection.TGLIST);
+
 		String[] sar = val.split(",");
 		for (int i = 0; i < sar.length; i++) {
 			try {
@@ -107,6 +135,15 @@ public class ServiceConnection implements Runnable {
 			} catch (Exception ex) {
 			}
 		}
+
+		// add the mapped TGs
+		if (transOut != null) {
+			for (Integer key : transOut.keySet()) {
+				if (ret.put(key, this) == null)
+					logger.log(config.getName() + " adding TG " + key);
+			}
+		}
+
 		return ret;
 	}
 
@@ -181,24 +218,43 @@ public class ServiceConnection implements Runnable {
 	}
 
 	public void handleDataPacket(DatagramPacket packet, DMRDecode decode) {
-		//rewrite the repeater if needed
-		int rptr = decode.getRpt() ;
-		if( repeaterId!=rptr) {
-			//rewrite the repeater id
-			byte[] bar = packet.getData();
-			DMRDecode.intToBytes(repeaterId, bar,11) ;
-			
-			//May need a better way to tell a group from a person
-			//for now change to group for under 1M
-			if( decode.getDst() < 1000000 ) {
-				int type = decode.getType();
-				//set Group flag
-				bar[15] =  (byte) (type  & 0xBF) ;				
-			}
-			
-		}		
-		logger.log(config.getName() + " " +repeaterId+" Data: " + decode);
+		// rewrite the repeater if needed
+		int rptr = decode.getRpt();
+		byte[] bar = packet.getData();
+
+		if (repeaterId != rptr) {
+			// rewrite the repeater id
+			DMRDecode.intToBytes(repeaterId, bar, 11);
+		}
+
+		// May need a better way to tell a group from a person
+		// for now change to group for under 1M
+		if (decode.getDst() < 1000000) {
+			int type = decode.getType();
+			// set Group flag
+			bar[15] = (byte) (type & 0xBF);
+		}
+
+		// check if TG is mapped to a alt tg, rewrite if needed
+		if (transOut != null) {
+			Integer origtg = transOut.get(decode.getDst());
+			if (origtg != null)
+				DMRDecode.intTo3Bytes(origtg, bar, 8);
+		}
+
+		logger.log(config.getName() + " " + repeaterId + " Data: " + decode);
 		send(packet, true);
+	}
+
+	public void handleOutgoingMapping(DatagramPacket packet, DMRDecode decode) {
+		// check if TG is mapped to a alt tg, rewrite if needed
+		if (transIn != null) {
+			Integer alttg = transIn.get(decode.getDst());
+			if (alttg != null) {
+				byte[] bar = packet.getData();
+				DMRDecode.intTo3Bytes(alttg, bar, 8);
+			}
+		}
 	}
 
 	public DatagramPacket waitForResponse(DatagramPacket packet) {
@@ -289,8 +345,9 @@ public class ServiceConnection implements Runnable {
 	 * Called by ServiceManager Timer
 	 */
 	public void handlePing() {
-		pingCount++ ;
-		if(logger.log(2)) logger.log(config.getName() + " RPTPING");
+		pingCount++;
+		if (logger.log(2))
+			logger.log(config.getName() + " RPTPING");
 		try {
 			byte[] bar = new byte[11];
 			DMRServer.addToBytes(bar, 0, "RPTPING");
@@ -303,20 +360,21 @@ public class ServiceConnection implements Runnable {
 	}
 
 	public void handlePong() {
-		pongCount++ ;
-		if(logger.log(2)) logger.log(config.getName() + " MSTPONG");
+		pongCount++;
+		if (logger.log(2))
+			logger.log(config.getName() + " MSTPONG");
 		markTime();
 	}
 
 	public void pingPongReset() {
-		pingCount=0;
-		pongCount=0;
+		pingCount = 0;
+		pongCount = 0;
 	}
-	
+
 	public String getPingPong() {
-		return "["+pingCount+":"+pongCount+"]" ;
+		return "[" + pingCount + ":" + pongCount + "]";
 	}
-	
+
 	public void handleNAK() {
 		logger.log(config.getName() + " MSTNAK  Connect is reset");
 		isAuthenticated = false;
@@ -366,7 +424,7 @@ public class ServiceConnection implements Runnable {
 			packet.setPort(port);
 
 			isAuthenticated = login(packet);
-			logger.log(getName()+" login status: " + isAuthenticated);
+			logger.log(getName() + " login status: " + isAuthenticated);
 
 			packet = new DatagramPacket(bar, bar.length);
 		} catch (Exception ex) {

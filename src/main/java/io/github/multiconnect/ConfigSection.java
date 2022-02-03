@@ -14,6 +14,7 @@ public class ConfigSection {
 	public static String REMOTE_PORT = "RemotePort";
 	public static String PASSWORD = "Password";
 	public static String TGLIST = "tglist";
+	public static String TGMAP = "tgmap";
 	public static String SERVER_KEY = "ServerKey";
 	public static String CLIENT_KEY = "ClientKey";
 
