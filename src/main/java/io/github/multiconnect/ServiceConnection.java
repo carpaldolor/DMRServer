@@ -250,9 +250,11 @@ public class ServiceConnection implements Runnable {
 		// check if TG is mapped to a alt tg, rewrite if needed
 		if (transIn != null) {
 			Integer alttg = transIn.get(decode.getDst());
+			if(logger.log(3)) logger.log("handleOutgoingMapping "+decode.getDst()+" "+ alttg+" "+transIn) ;
 			if (alttg != null) {
 				byte[] bar = packet.getData();
-				DMRDecode.intTo3Bytes(alttg, bar, 8);
+				DMRDecode.intTo3Bytes(alttg, bar, 8);			
+				decode.parsePacket(packet) ;
 			}
 		}
 	}

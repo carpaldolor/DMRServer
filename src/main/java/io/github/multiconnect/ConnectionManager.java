@@ -275,7 +275,7 @@ public class ConnectionManager implements Runnable {
 	 */
 	public synchronized void handleOutgoing(DatagramPacket packet, ServiceConnection sender) {
 		DMRDecode decode = new DMRDecode(packet);
-		sender.handleOutgoingMapping(packet, decode);
+		sender.handleOutgoingMapping(packet, decode) ;
 		
 		if (currentTalker == 0 && !decode.isTerminate()) {
 

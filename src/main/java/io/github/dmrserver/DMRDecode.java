@@ -25,17 +25,21 @@ public class DMRDecode {
 	String decodeString ;
 
 	public DMRDecode(DatagramPacket packet) {
-		this.bar = packet.getData();
-		this.len = packet.getLength();
-		decodeString = decode();
+		parsePacket(packet) ;
 	}
-	
+		
 	public DMRDecode(byte[] bar, int len) {
 		this.bar = bar;
 		this.len = len;
 		decodeString = decode();
 	}
 
+	public void parsePacket(DatagramPacket packet) {
+		this.bar = packet.getData();
+		this.len = packet.getLength();
+		decodeString = decode();		
+	}
+	
 	public String getTag() {
 		return tag;
 	}
@@ -187,6 +191,5 @@ public class DMRDecode {
 	public int getSubType() {
 		return subType;
 	}
-
 
 }
