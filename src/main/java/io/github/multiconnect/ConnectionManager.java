@@ -49,6 +49,8 @@ public class ConnectionManager implements Runnable {
 
 		df.setMaximumFractionDigits(1);
 
+		lastPingMsg = System.currentTimeMillis();
+
 	}
 
 	public void markChannelReserve(DMRDecode decode) {
@@ -65,7 +67,7 @@ public class ConnectionManager implements Runnable {
 	 * Called by the Timer Task
 	 */
 	public void pingAll() {
-		if ((lastPingMsg > 0L) && ((System.currentTimeMillis() - lastPingMsg) > 59000L)) {
+		if  ((System.currentTimeMillis() - lastPingMsg) > 59000L) {
 			StringBuffer sb = new StringBuffer();
 			sb.append("Service [ping:pong] ");
 			String sep = "";
@@ -273,6 +275,8 @@ public class ConnectionManager implements Runnable {
 	 */
 	public synchronized void handleOutgoing(DatagramPacket packet, ServiceConnection sender) {
 		DMRDecode decode = new DMRDecode(packet);
+		sender.handleOutgoingMapping(packet, decode) ;
+		
 		if (currentTalker == 0 && !decode.isTerminate()) {
 
 			if (!isChannelReserveLocked(decode)) {
