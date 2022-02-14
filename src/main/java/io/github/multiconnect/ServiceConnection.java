@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
@@ -23,8 +24,8 @@ public class ServiceConnection implements Runnable {
 
 	ConnectionManager conMan = null;
 	ConfigSection config;
-	DatagramSocket remoteSocket;
-	InetAddress remoteAddress;
+	DatagramSocket remoteSocket = null;
+	InetAddress remoteAddress = null;
 	int remotePort;
 
 	boolean allowBreakin = false;
@@ -44,12 +45,6 @@ public class ServiceConnection implements Runnable {
 		String val = config.getParam(ConfigSection.REPEATER_ID);
 		repeaterId = Integer.parseInt(val);
 
-		try {
-			remoteAddress = InetAddress.getByName(config.getParam(ConfigSection.REMOTE_IP));
-		} catch (UnknownHostException ex) {
-			Logger.handleException(ex);
-		}
-		remotePort = config.getIntParam(ConfigSection.REMOTE_PORT);
 		markTime();
 
 		allowBreakin = config.checkVal("Breakin", "1");
@@ -155,10 +150,18 @@ public class ServiceConnection implements Runnable {
 		this.conMan = conMan;
 	}
 
+	public void checkConnect() throws IOException {
+		if (remoteAddress == null) {
+			remoteAddress = InetAddress.getByName(config.getParam(ConfigSection.REMOTE_IP));
+			remotePort = config.getIntParam(ConfigSection.REMOTE_PORT);
+		}
+		if (remoteSocket == null) {
+			remoteSocket = new DatagramSocket();
+		}
+	}
+
 	public void start() {
 		try {
-			remoteSocket = new DatagramSocket();
-
 			Thread th = new Thread(this);
 			th.setName(config.getName());
 			th.start();
@@ -209,6 +212,9 @@ public class ServiceConnection implements Runnable {
 					serverEncryption.encryptPacket(packet);
 				}
 			}
+
+			checkConnect();
+
 			packet.setAddress(remoteAddress);
 			packet.setPort(remotePort);
 			remoteSocket.send(packet);
@@ -250,11 +256,12 @@ public class ServiceConnection implements Runnable {
 		// check if TG is mapped to a alt tg, rewrite if needed
 		if (transIn != null) {
 			Integer alttg = transIn.get(decode.getDst());
-			if(logger.log(3)) logger.log("handleOutgoingMapping "+decode.getDst()+" "+ alttg+" "+transIn) ;
+			if (logger.log(3))
+				logger.log("handleOutgoingMapping " + decode.getDst() + " " + alttg + " " + transIn);
 			if (alttg != null) {
 				byte[] bar = packet.getData();
-				DMRDecode.intTo3Bytes(alttg, bar, 8);			
-				decode.parsePacket(packet) ;
+				DMRDecode.intTo3Bytes(alttg, bar, 8);
+				decode.parsePacket(packet);
 			}
 		}
 	}
@@ -291,13 +298,20 @@ public class ServiceConnection implements Runnable {
 		return tag.equals("RPTACK");
 	}
 
-	public boolean login(DatagramPacket packet) {
+	public boolean login() {
 		logger.log("Starting login to Service: " + config.getName());
+
+		byte[] bar = new byte[2048];
+		DatagramPacket packet = new DatagramPacket(bar, bar.length);
 
 		long waitTime = 1000;
 		while (!isAuthenticated) {
 
 			try {
+				checkConnect();
+				packet.setAddress(remoteAddress);
+				packet.setPort(remotePort);
+
 				// send init
 				sendLoginInit(packet);
 				if ((packet = waitForResponse(packet)) != null) {
@@ -380,9 +394,7 @@ public class ServiceConnection implements Runnable {
 	public void handleNAK() {
 		logger.log(config.getName() + " MSTNAK  Connect is reset");
 		isAuthenticated = false;
-		byte[] bar = new byte[2048];
-		DatagramPacket packet = new DatagramPacket(bar, bar.length);
-		login(packet);
+		login();
 	}
 
 	public void handlePacket(DatagramPacket packet) throws IOException {
@@ -420,21 +432,17 @@ public class ServiceConnection implements Runnable {
 		byte[] bar = new byte[2048];
 		DatagramPacket packet = new DatagramPacket(bar, bar.length);
 		try {
-			InetAddress addr = InetAddress.getByName(config.getParam(ConfigSection.REMOTE_IP));
-			packet.setAddress(addr);
-			int port = config.getIntParam(ConfigSection.LOCAL_PORT);
-			packet.setPort(port);
-
-			isAuthenticated = login(packet);
+			isAuthenticated = login();
 			logger.log(getName() + " login status: " + isAuthenticated);
 
-			packet = new DatagramPacket(bar, bar.length);
 		} catch (Exception ex) {
 			Logger.handleException(ex);
 		}
 
 		while (true) {
 			try {
+				checkConnect();
+
 				remoteSocket.setSoTimeout(0);
 				packet.setAddress(remoteAddress);
 				packet.setPort(remotePort);
@@ -445,6 +453,10 @@ public class ServiceConnection implements Runnable {
 				}
 			} catch (Exception ex) {
 				Logger.handleException(ex);
+				try {
+					Thread.sleep(2000);
+				} catch (InterruptedException e) {
+				}
 			}
 		}
 	}

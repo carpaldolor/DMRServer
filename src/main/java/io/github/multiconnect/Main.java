@@ -12,6 +12,10 @@ public class Main {
 	
 	public static void main(String[] args) {
 		
+		//disable the DNS cache
+		java.security.Security.setProperty("networkaddress.cache.ttl", "0");
+		System.setProperty("sun.net.inetaddr.ttl","0") ; 
+		
 		String configFile = getArg(args, "-config") ;
 		if( configFile==null) configFile = "multi_connect.ini" ;
 		
