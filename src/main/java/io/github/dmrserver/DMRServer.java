@@ -7,7 +7,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -21,8 +20,6 @@ import java.util.Timer;
  */
 public class DMRServer implements Runnable {
 	public static Logger logger = Logger.getLogger();
-
-	public static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-KKmmss");
 
 	public static boolean enableCapture = false;
 	public static boolean enableReplay = false;
@@ -89,24 +86,25 @@ public class DMRServer implements Runnable {
 		return ret;
 	}
 
-	public void forward(DatagramPacket packet) {
+	public void forward(DatagramPacket packet, boolean replay) {
 		InetAddress srcHost = packet.getAddress();
 		int srcPort = packet.getPort();
 		ArrayList<DMRSessionKey> purgeList = null;
 		Set<DMRSessionKey> keySet = new HashSet<DMRSessionKey>();
 		keySet.addAll(sessionMap.keySet());
 		for (DMRSessionKey key : keySet) {
+
 			try {
 				DMRSession session = sessionMap.get(key);
 				if (session != null) {
 					if (!session.isExpired()) {
 						// filter self
-						if (srcPort != session.getPort() || !isSameAddr(srcHost, session.getAddress())) {
+						if (srcPort != session.getPort() || !isSameAddr(srcHost, session.getAddress()) || replay) {
 							packet.setPort(session.getPort());
 							packet.setAddress(session.getAddress());
 
 							session.sendPacket(packet);
-						}
+						} 
 					} else {
 						if (purgeList == null)
 							purgeList = new ArrayList<DMRSessionKey>();
@@ -229,8 +227,7 @@ public class DMRServer implements Runnable {
 						capture.add(packet);
 						if (dec.isTerminate()) {
 							if (enableCapture) {
-								String fname = "msg-" + sdf.format(new Date()) + ".dat";
-								capture.log(fname);
+								capture.log(dec);
 							}
 							if (enableReplay) {
 								if (logger.log(1))
@@ -241,7 +238,7 @@ public class DMRServer implements Runnable {
 						}
 					}
 					// forward
-					forward(packet);
+					forward(packet, false);
 				}
 			} else {
 				// expired session

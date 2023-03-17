@@ -8,9 +8,13 @@ import java.io.Serializable;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Date;
+import java.text.SimpleDateFormat;
+
 
 public class DMRCapture implements Serializable {
     private static final long serialVersionUID = 0L;
+	public static SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-KKmmss");
 
 	InetAddress host ;
 	int port ;
@@ -64,7 +68,9 @@ public class DMRCapture implements Serializable {
 		return ret ;
 	}
 
-	public void log(String fname)  {
+	public void log(DMRDecode dec)  {
+		String fname = "msg-"+dec.getSrc()+"-" + sdf.format(new Date()) + ".dat";
+
 		try {
 			FileOutputStream fos = new FileOutputStream(fname) ;
 	        ObjectOutputStream oos = new ObjectOutputStream(fos);

@@ -51,7 +51,7 @@ public class ReplayTask extends TimerTask {
 				logger.log("write replay: " + dec.toString() + " " + rec.getTime());
 
 				try {
-					server.forward(packet);
+					server.forward(packet, true);
 					// local_socket.send( packet) ;
 				} catch (Exception ex) {
 					Logger.handleException(ex);
